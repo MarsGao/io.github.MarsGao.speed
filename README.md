@@ -114,8 +114,40 @@ cd biliSpeed
 项目采用多重 Hook 策略确保兼容性：
 
 1. **通用播放器 Hook**: 动态查找播放器相关类
-2. **方法签名 Hook**: 匹配所有可能的播放速度设置方法
-3. **智能判断**: 通过调用栈分析区分自动播放和手动设置
+2. **腾讯视频SDK Hook**: 支持 TXVodPlayer、TXLivePlayer 等底层播放器
+3. **方法签名 Hook**: 匹配所有可能的播放速度设置方法
+4. **系统MediaPlayer Hook**: 作为兜底方案
+5. **智能判断**: 通过调用栈分析区分自动播放和手动设置
+
+## 更新日志
+
+### v1.1.8 (2025-11-30)
+
+**🔧 微信视频号兼容性修复**
+
+- **问题诊断**: 通过日志分析发现 `FinderThumbPlayerProxy.setPlaySpeed` 虽然Hook成功，但从未被调用
+- **根本原因**: 微信视频号使用腾讯视频SDK (liteav) 作为底层播放器
+
+**新增功能**:
+- ✅ 新增腾讯视频SDK (liteav) Hook支持
+  - `TXVodPlayer.setRate` - 点播播放器
+  - `TXLivePlayer.setRate` - 直播播放器
+  - ExoPlayer 备用方案
+- ✅ 新增播放开始时设置速度 (`startVodPlay`、`resume`、`start`、`play`)
+- ✅ 新增系统 `MediaPlayer.setPlaybackParams` Hook作为兜底
+- ✅ 扩展了播放器类列表，包括 Kinda 框架视频组件
+- ✅ 增强日志输出，便于问题诊断
+
+**支持的播放器类**:
+- FinderThumbPlayerProxy, FinderVideoPlayer, FinderVideoCore
+- SnsVideoPlayer, MMVideoPlayer, AppBrandVideoPlayer
+- TXVodPlayer, TXLivePlayer (腾讯视频SDK)
+- android.media.MediaPlayer (系统播放器)
+
+### v1.1.7
+
+- 初始微信视频号支持
+- 多策略Hook架构
 
 ## 许可证
 
