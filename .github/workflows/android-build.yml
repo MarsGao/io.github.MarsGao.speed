@@ -48,12 +48,12 @@ jobs:
       if: env.SIGNING_STORE_PASSWORD != ''
 
     - name: Build release APK (if keystore provided)
+      id: build_release
       run: ./gradlew assembleRelease --no-daemon
       env:
         SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
         SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
         SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
-      if: env.SIGNING_STORE_PASSWORD != ''
 
     - name: Upload debug APK
       uses: actions/upload-artifact@v4
@@ -66,15 +66,14 @@ jobs:
       with:
         name: biliSpeed-release
         path: app/build/outputs/apk/release/app-release.apk
-      if: env.SIGNING_STORE_PASSWORD != ''
+      if: always() && steps.build_release.outcome == 'success'
 
     - name: Create GitHub Release
       if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         files: |
           app/build/outputs/apk/debug/app-debug.apk
         generate_release_notes: true
         draft: true
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        token: ${{ secrets.GITHUB_TOKEN }}
