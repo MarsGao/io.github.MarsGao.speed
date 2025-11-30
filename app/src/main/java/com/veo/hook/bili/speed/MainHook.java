@@ -642,14 +642,93 @@ public class MainHook implements IXposedHookLoadPackage {
                 });
                 XposedBridge.log("hooked ig BreakpadManager");
             } else if (tg) {
-                XposedHelpers.findAndHookMethod("org.telegram.ui.PhotoViewer", lpparam.classLoader, "preparePlayer", "android.net.Uri", boolean.class, boolean.class, "org.telegram.messenger.MediaController$SavedFilterState", new XC_MethodHook() {
-                    @Override
-                    protected void beforeHookedMethod(MethodHookParam param) {
-                        Object thisObject = param.thisObject;
-                        XposedHelpers.setObjectField(thisObject, "currentVideoSpeed", getSpeedConfig());
-                        XposedBridge.log("tg speed set");
+                // Telegram Hook - 尝试多种方法签名以兼容不同版本
+                boolean tgHooked = false;
+                
+                // 方案1: 尝试旧版签名
+                try {
+                    XposedHelpers.findAndHookMethod("org.telegram.ui.PhotoViewer", lpparam.classLoader, "preparePlayer", "android.net.Uri", boolean.class, boolean.class, "org.telegram.messenger.MediaController$SavedFilterState", new XC_MethodHook() {
+                        @Override
+                        protected void beforeHookedMethod(MethodHookParam param) {
+                            Object thisObject = param.thisObject;
+                            XposedHelpers.setObjectField(thisObject, "currentVideoSpeed", getSpeedConfig());
+                            XposedBridge.log("tg speed set (v1)");
+                        }
+                    });
+                    tgHooked = true;
+                    XposedBridge.log("hooked tg preparePlayer (v1)");
+                } catch (Exception e1) {
+                    XposedBridge.log("tg preparePlayer v1 failed: " + e1.getMessage());
+                }
+                
+                // 方案2: 尝试新版签名（无SavedFilterState参数）
+                if (!tgHooked) {
+                    try {
+                        XposedHelpers.findAndHookMethod("org.telegram.ui.PhotoViewer", lpparam.classLoader, "preparePlayer", "android.net.Uri", boolean.class, boolean.class, new XC_MethodHook() {
+                            @Override
+                            protected void beforeHookedMethod(MethodHookParam param) {
+                                Object thisObject = param.thisObject;
+                                XposedHelpers.setObjectField(thisObject, "currentVideoSpeed", getSpeedConfig());
+                                XposedBridge.log("tg speed set (v2)");
+                            }
+                        });
+                        tgHooked = true;
+                        XposedBridge.log("hooked tg preparePlayer (v2)");
+                    } catch (Exception e2) {
+                        XposedBridge.log("tg preparePlayer v2 failed: " + e2.getMessage());
                     }
-                });
+                }
+                
+                // 方案3: Hook setVideoSpeed方法作为备选
+                try {
+                    Class<?> photoViewerClass = XposedHelpers.findClass("org.telegram.ui.PhotoViewer", lpparam.classLoader);
+                    for (Method method : photoViewerClass.getDeclaredMethods()) {
+                        if (method.getName().equals("setVideoSpeed") || method.getName().equals("setPlaybackSpeed")) {
+                            XposedBridge.hookMethod(method, new XC_MethodHook() {
+                                @Override
+                                protected void beforeHookedMethod(MethodHookParam param) {
+                                    if (param.args.length > 0 && param.args[0] instanceof Float) {
+                                        float speed = (float) param.args[0];
+                                        if (Math.abs(speed - 1.0f) < 0.01f) {
+                                            param.args[0] = getSpeedConfig();
+                                            XposedBridge.log("tg speed intercepted: " + getSpeedConfig());
+                                        }
+                                    }
+                                }
+                            });
+                            XposedBridge.log("hooked tg " + method.getName());
+                        }
+                    }
+                } catch (Exception e3) {
+                    XposedBridge.log("tg setVideoSpeed hook failed: " + e3.getMessage());
+                }
+                
+                // 方案4: Hook VideoPlayer类
+                try {
+                    Class<?> videoPlayerClass = XposedHelpers.findClassIfExists("org.telegram.ui.Components.VideoPlayer", lpparam.classLoader);
+                    if (videoPlayerClass != null) {
+                        for (Method method : videoPlayerClass.getDeclaredMethods()) {
+                            if (method.getName().equals("setPlaybackSpeed") && method.getParameterCount() == 1) {
+                                XposedBridge.hookMethod(method, new XC_MethodHook() {
+                                    @Override
+                                    protected void beforeHookedMethod(MethodHookParam param) {
+                                        if (param.args[0] instanceof Float) {
+                                            float speed = (float) param.args[0];
+                                            if (Math.abs(speed - 1.0f) < 0.01f) {
+                                                param.args[0] = getSpeedConfig();
+                                                XposedBridge.log("tg VideoPlayer speed set: " + getSpeedConfig());
+                                            }
+                                        }
+                                    }
+                                });
+                                XposedBridge.log("hooked tg VideoPlayer.setPlaybackSpeed");
+                            }
+                        }
+                    }
+                } catch (Exception e4) {
+                    XposedBridge.log("tg VideoPlayer hook failed: " + e4.getMessage());
+                }
+                
                 XposedBridge.log("hooked tg setPlaybackSpeed");
             } else if (wx) {
                 logWeChatHook("Starting WeChat hook with multi-strategy approach");
@@ -960,27 +1039,56 @@ public class MainHook implements IXposedHookLoadPackage {
 
     /**
      * 检查是否是用户手动设置速度（通过检查调用栈）
+     * 改进版本：更精确地判断用户交互，避免误判
      */
     private static boolean isManualSpeedChange() {
         StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
-        for (int i = 3; i < Math.min(25, stackTrace.length); i++) {
+        
+        // 记录调用栈用于调试
+        StringBuilder stackInfo = new StringBuilder();
+        for (int i = 3; i < Math.min(15, stackTrace.length); i++) {
+            stackInfo.append(stackTrace[i].getClassName()).append(".").append(stackTrace[i].getMethodName()).append(" -> ");
+        }
+        logWeChatHook("[StackTrace] " + stackInfo.toString());
+        
+        for (int i = 3; i < Math.min(20, stackTrace.length); i++) {
             String className = stackTrace[i].getClassName().toLowerCase();
             String methodName = stackTrace[i].getMethodName().toLowerCase();
             
-            // 检查是否是用户交互触发的
-            if (className.contains("onclick") || className.contains("touch") ||
-                className.contains("gesture") || className.contains("click") ||
-                methodName.contains("onclick") || methodName.contains("ontouch") ||
-                methodName.contains("performclick") || methodName.contains("dispatch")) {
+            // 只检测明确的用户交互方法，避免误判
+            // 1. 检查点击事件 - 必须是完整的onClick方法
+            if (methodName.equals("onclick") || methodName.equals("onitemclick")) {
+                logWeChatHook("[Manual] Detected click event: " + className + "." + methodName);
                 return true;
             }
             
-            // 检查是否是UI组件触发的速度选择
+            // 2. 检查触摸事件 - 只检测onTouchEvent，不检测dispatch
+            if (methodName.equals("ontouchevent") || methodName.equals("ontouch")) {
+                logWeChatHook("[Manual] Detected touch event: " + className + "." + methodName);
+                return true;
+            }
+            
+            // 3. 检查performClick - 这是View的点击确认方法
+            if (methodName.equals("performclick") || methodName.equals("performlongclick")) {
+                logWeChatHook("[Manual] Detected perform click: " + className + "." + methodName);
+                return true;
+            }
+            
+            // 4. 检查速度选择UI组件
             if (className.contains("speedpanel") || className.contains("speedmenu") ||
-                className.contains("speedselector") || className.contains("speedcontrol")) {
+                className.contains("speedselector") || className.contains("speedcontrol") ||
+                className.contains("playerspeed") || className.contains("ratemenu")) {
+                logWeChatHook("[Manual] Detected speed UI: " + className);
+                return true;
+            }
+            
+            // 5. 检查Finder视频号特有的速度选择器
+            if (className.contains("finder") && (className.contains("speed") || className.contains("rate"))) {
+                logWeChatHook("[Manual] Detected Finder speed selector: " + className);
                 return true;
             }
         }
+        
         return false;
     }
 
@@ -1026,29 +1134,72 @@ public class MainHook implements IXposedHookLoadPackage {
         }
     }
 
+    // 用于追踪每个播放器实例的最后设置速度，避免重复设置
+    private static final java.util.Map<Object, Float> lastSpeedMap = new java.util.concurrent.ConcurrentHashMap<>();
+    // 记录每个实例最后一次设置非1.0速度的时间，用于判断用户是否刚刚手动调整过
+    private static final java.util.Map<Object, Long> lastManualChangeTimeMap = new java.util.concurrent.ConcurrentHashMap<>();
+    // 判断间隔（毫秒）- 如果用户刚设置过自定义速度，短时间内不自动修改
+    private static final long MANUAL_CHANGE_COOLDOWN = 3000L;
+    
     /**
-     * 改进的速度判断逻辑
+     * 改进的速度判断逻辑 - 更智能的自动设置
      */
     private static void handleWeChatSpeedChange(XC_MethodHook.MethodHookParam param, String source) {
         try {
             float speed = (float) param.args[0];
             float targetSpeed = getSpeedConfig();
+            Object playerInstance = param.thisObject;
 
             // 记录每次调用，便于调试
             logWeChatHook("[Proxy] " + source + " called with speed: " + speed + ", target: " + targetSpeed);
 
-            // 使用浮点数比较，避免精度问题
-            if (Math.abs(speed - 1.0f) < 0.01f && Math.abs(targetSpeed - 1.0f) > 0.01f) {
-                // 检查是否是用户手动设置
-                if (!isManualSpeedChange()) {
-                    param.args[0] = targetSpeed;
-                    logWeChatHook("[Proxy] Auto speed set from " + source + ": " + targetSpeed);
-                } else {
-                    logWeChatHook("[Proxy] Manual speed change detected, keeping: " + speed);
+            // 获取该实例的上次速度设置
+            Float lastSpeed = lastSpeedMap.get(playerInstance);
+            Long lastManualTime = lastManualChangeTimeMap.get(playerInstance);
+            long currentTime = System.currentTimeMillis();
+            
+            // 检查是否在用户手动修改的冷却期内
+            boolean inCooldown = lastManualTime != null && (currentTime - lastManualTime) < MANUAL_CHANGE_COOLDOWN;
+            
+            // 如果目标速度就是1.0，不需要做任何修改
+            if (Math.abs(targetSpeed - 1.0f) < 0.01f) {
+                logWeChatHook("[Proxy] Target is 1.0x, no modification needed");
+                lastSpeedMap.put(playerInstance, speed);
+                return;
+            }
+            
+            // 如果传入的速度是1.0，检查是否需要自动设置为目标速度
+            if (Math.abs(speed - 1.0f) < 0.01f) {
+                // 检查是否是用户手动设置1.0
+                if (isManualSpeedChange()) {
+                    logWeChatHook("[Proxy] User manually set to 1.0x, respecting");
+                    lastSpeedMap.put(playerInstance, speed);
+                    lastManualChangeTimeMap.put(playerInstance, currentTime);
+                    return;
                 }
-            } else if (Math.abs(speed - 1.0f) >= 0.01f) {
-                // 用户设置了非1.0的速度，不干预
+                
+                // 在冷却期内不自动修改
+                if (inCooldown) {
+                    logWeChatHook("[Proxy] In cooldown period, keeping: " + speed);
+                    lastSpeedMap.put(playerInstance, speed);
+                    return;
+                }
+                
+                // 自动设置为目标速度
+                param.args[0] = targetSpeed;
+                lastSpeedMap.put(playerInstance, targetSpeed);
+                logWeChatHook("[Proxy] Auto speed set from " + source + ": " + targetSpeed);
+            } 
+            // 如果传入的速度不是1.0，说明是用户手动设置或已经被我们修改过
+            else if (Math.abs(speed - targetSpeed) > 0.01f) {
+                // 用户设置了不同于目标的速度，记录为手动修改
                 logWeChatHook("[Proxy] User custom speed detected: " + speed);
+                lastSpeedMap.put(playerInstance, speed);
+                lastManualChangeTimeMap.put(playerInstance, currentTime);
+            } else {
+                // 速度已经是目标速度，正常通过
+                logWeChatHook("[Proxy] Speed already at target: " + speed);
+                lastSpeedMap.put(playerInstance, speed);
             }
         } catch (Exception e) {
             logWeChatHook("[Proxy] Error in speed change handler: " + e.getMessage());
