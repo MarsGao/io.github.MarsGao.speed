@@ -13,10 +13,10 @@ def getVersionCode(name) {
 }
 
 android {
-    namespace 'com.veo.hook.bili.speed'
+    namespace 'io.github.MarsGao.speed'
     compileSdkVersion 33
     defaultConfig {
-        applicationId "com.veo.hook.bili.speed"
+        applicationId "io.github.MarsGao.speed"
         minSdkVersion 26
         targetSdkVersion 33
         versionCode getVersionCode(appVersionName)

@@ -1,4 +1,4 @@
-package com.veo.hook.bili.speed;
+package io.github.MarsGao.speed;
 
 
 import android.app.Activity;
@@ -56,3 +56,4 @@ public class MainActivity extends Activity {
         });
     }
 }
+

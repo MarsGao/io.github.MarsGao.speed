@@ -1,4 +1,4 @@
-package com.veo.hook.bili.speed;
+package io.github.MarsGao.speed;
 
 
 import android.content.Context;
@@ -35,7 +35,8 @@ public class MainHook implements IXposedHookLoadPackage {
     public final static String hookPackageIg1 = "com.instander.android";
     public final static String hookPackageTg = "org.telegram.messenger";
     public final static String hookPackageWx = "com.tencent.mm";
-    private final static XSharedPreferences prefs = new XSharedPreferences("com.veo.hook.bili.speed", "speed");
+    // 使用新包名
+    private final static XSharedPreferences prefs = new XSharedPreferences("io.github.MarsGao.speed", "speed");
     private static XC_MethodHook.Unhook first = null;
     private static XC_MethodHook.Unhook second = null;
     private static XC_MethodHook.Unhook third = null;
@@ -148,92 +149,6 @@ public class MainHook implements IXposedHookLoadPackage {
 
             } else if (bili) {
                 // bilibili configured to tv.danmaku.ijk.media.player.IjkMediaPlayer
-//                float[] speedConfig = {getSpeedConfig()};
-//
-//                XposedHelpers.findAndHookMethod("tv.danmaku.ijk.media.player.IjkMediaPlayer", lpparam.classLoader, "start", new XC_MethodHook() {
-//                    @Override
-//                    protected void afterHookedMethod(MethodHookParam param) {
-//                        Object thisObject = param.thisObject;
-//                        if (hasSpeedConfigChanged()) {
-//                            speedConfig[0] = getSpeedConfig();
-//                        }
-//                        XposedHelpers.callMethod(thisObject, "setSpeed", speedConfig[0]);
-//                        XposedBridge.log("bili setSpeed: " + speedConfig[0]);
-//                    }
-//                });
-//
-//                XposedHelpers.findAndHookMethod("tv.danmaku.ijk.media.player.IjkMediaPlayer", lpparam.classLoader, "setSpeed", float.class, new XC_MethodHook() {
-//                    @Override
-//                    protected void afterHookedMethod(MethodHookParam param) {
-//                        XposedBridge.log(String.valueOf(param.args[0]));
-//                        XposedBridge.log(Log.getStackTraceString(new Throwable()));
-//
-//                        if ((float) param.args[0] != speedConfig[0]) {
-//                            StackTraceElement[] stackTraceElements = Thread.currentThread().getStackTrace();
-//                            for (int i = 4; i < stackTraceElements.length; i++) {
-//                                // return on manually speed tweak
-//                                if (stackTraceElements[i].getClassName().equals("com.bilibili.player.tangram.basic.PlaySpeedManagerImpl")) {
-//                                    XposedBridge.log("bili manual speed: " + param.args[0]);
-//                                    speedConfig[0] = (float) param.args[0];
-//                                    return;
-//                                }
-//                            }
-//                        }
-//                    }
-//                });
-
-//                XposedHelpers.findAndHookMethod("tv.danmaku.ijk.media.player.IjkMediaPlayer$EventHandler", lpparam.classLoader, "handleMessage", Message.class, new XC_MethodHook() {
-//                    @Override
-//                    protected void beforeHookedMethod(MethodHookParam param) {
-//                        Message msg = (Message) param.args[0];
-//                        XposedBridge.log(String.valueOf(msg.what));
-//                    }
-//                });
-//                float[] speedConfig = {getSpeedConfig()};
-//
-//                Class<?> clz = XposedHelpers.findClass("tv.danmaku.ijk.media.player.IjkMediaPlayer", lpparam.classLoader);
-//                Method method = XposedHelpers.findMethodExact(clz, "setSpeed", float.class);
-//                XposedBridge.hookMethod(method, new XC_MethodHook() {
-//                    @Override
-//                    protected void beforeHookedMethod(MethodHookParam param) {
-//                        XposedBridge.log(Log.getStackTraceString(new Throwable()));
-//
-//                        if ((float) param.args[0] != speedConfig[0]) {
-//                            StackTraceElement[] stackTraceElements = Thread.currentThread().getStackTrace();
-//                            for (int i = 4; i < stackTraceElements.length; i++) {
-//                                // return on manually speed tweak
-//                                if (stackTraceElements[i].getClassName().equals("com.bilibili.player.tangram.basic.PlaySpeedManagerImpl")) {
-//                                    XposedBridge.log("bili manual speed: " + param.args[0]);
-//                                    speedConfig[0] = (float) param.args[0];
-//                                    return;
-//                                }
-//                            }
-//                        }
-//                    }
-//                });
-//
-//                XposedBridge.log("bili hooked setSpeed");
-
-//                XposedHelpers.findAndHookMethod("tv.danmaku.ijk.media.player.IjkMediaPlayer", lpparam.classLoader, "start", new XC_MethodHook() {
-//                    @Override
-//                    protected void afterHookedMethod(MethodHookParam param) {
-//                        Object thisObject = param.thisObject;
-//                        if (hasSpeedConfigChanged()) {
-//                            speedConfig[0] = getSpeedConfig();
-//                        }
-//                        try {
-//                            method.invoke(thisObject,  speedConfig[0]);
-//                        } catch (IllegalAccessException e) {
-//                            // should not happen
-//                            XposedBridge.log(e);
-//                            throw new IllegalAccessError(e.getMessage());
-//                        } catch (InvocationTargetException e) {
-//                            throw new RuntimeException(e);
-//                        }
-//                        XposedBridge.log("bili setSpeed: " + speedConfig[0]);
-//                    }
-//                });
-//                XposedBridge.log("bili hooked resume");
 
                 first = XposedHelpers.findAndHookMethod("tv.danmaku.ijk.media.player.AbstractMediaPlayer", lpparam.classLoader, "notifyOnInfo", int.class, int.class, Bundle.class, new XC_MethodHook() {
                     @Override
@@ -455,18 +370,6 @@ public class MainHook implements IXposedHookLoadPackage {
 
                 XposedBridge.log("hooked douyin setSpeed");
 
-                // 彩蛋：长按加速
-//                XposedHelpers.findAndHookMethod("com.bytedance.ies.abmock.ABManager", lpparam.classLoader, "getIntValue", boolean.class, String.class, int.class, int.class, new XC_MethodHook() {
-//                        @Override
-//                        protected void beforeHookedMethod(MethodHookParam param) {
-//                            if ("long_press_fast_speed_enabled_scene".equals(param.args[1])) {
-//                                param.setResult(Integer.valueOf(1));
-//                            } else if ("long_press_fast_speed_screen_scale".equals(param.args[1])) {
-//                                param.setResult(Integer.valueOf(40));
-//                            }
-//                        }
-//                    }
-//                );
             } else if (red) {
                 float[] speedConfig = {getSpeedConfig()};
 
@@ -1353,6 +1256,7 @@ public class MainHook implements IXposedHookLoadPackage {
      * 统一的微信日志输出
      */
     private static void logWeChatHook(String message) {
-        XposedBridge.log("[WeChatSpeed] " + message);
+        XposedBridge.log("[VideoSpeed] " + message);
     }
 }
+

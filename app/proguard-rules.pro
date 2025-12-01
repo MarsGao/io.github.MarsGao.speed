@@ -20,7 +20,7 @@
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
 
--keep public class com.veo.hook.bili.speed.MainHook
+-keep public class io.github.MarsGao.speed.MainHook
 -allowaccessmodification
 -overloadaggressively
 

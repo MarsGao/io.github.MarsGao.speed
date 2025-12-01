@@ -4,8 +4,8 @@ on:
   push:
     branches: [ master, main ]
     tags:
-      - 'v*'        # 触发 tag 发布 (如 v1.1.9)
-      - '[0-9]*'    # LSPosed 格式 (如 1001009-1.1.9)
+      - 'v*'        # 触发 tag 发布 (如 v1.2.0)
+      - '[0-9]*'    # LSPosed 格式 (如 1002000-1.2.0)
   pull_request:
     branches: [ master, main ]
   workflow_dispatch:  # 允许手动触发
@@ -56,8 +56,11 @@ jobs:
       id: version
       run: |
         VERSION=$(grep "appVersionName" gradle.properties | cut -d'=' -f2)
-        # 从 app/build.gradle 获取 versionCode
-        VERSION_CODE=$(grep "versionCode" app/build.gradle | head -1 | sed 's/[^0-9]//g')
+        # 计算 versionCode: major * 1000000 + minor * 1000 + hotfix
+        MAJOR=$(echo $VERSION | cut -d'.' -f1)
+        MINOR=$(echo $VERSION | cut -d'.' -f2)
+        HOTFIX=$(echo $VERSION | cut -d'.' -f3)
+        VERSION_CODE=$((MAJOR * 1000000 + MINOR * 1000 + HOTFIX))
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
         # LSPosed 格式: VersionCode-VersionName
@@ -72,14 +75,14 @@ jobs:
       run: |
         VERSION=${{ steps.version.outputs.version }}
         mkdir -p release
-        cp app/build/outputs/apk/debug/app-debug.apk release/biliSpeed_${VERSION}.apk
-        echo "APK renamed to: biliSpeed_${VERSION}.apk"
+        cp app/build/outputs/apk/debug/app-debug.apk release/VideoSpeed_${VERSION}.apk
+        echo "APK renamed to: VideoSpeed_${VERSION}.apk"
 
     - name: Upload debug APK (Artifact)
       uses: actions/upload-artifact@v4
       with:
-        name: biliSpeed_${{ steps.version.outputs.version }}
-        path: release/biliSpeed_${{ steps.version.outputs.version }}.apk
+        name: VideoSpeed_${{ steps.version.outputs.version }}
+        path: release/VideoSpeed_${{ steps.version.outputs.version }}.apk
 
     - name: Create GitHub Release (LSPosed Format)
       if: startsWith(github.ref, 'refs/tags/')
@@ -89,10 +92,10 @@ jobs:
         tag_name: ${{ steps.version.outputs.lsposed_tag }}
         name: ${{ steps.version.outputs.lsposed_tag }}
         body: |
-          ## Bili调速 v${{ steps.version.outputs.version }}
+          ## 视频调速 VideoSpeed v${{ steps.version.outputs.version }}
           
           ### 📦 下载
-          - **biliSpeed_${{ steps.version.outputs.version }}.apk** - Android APK 安装包
+          - **VideoSpeed_${{ steps.version.outputs.version }}.apk** - Android APK 安装包
           
           ### 📱 支持应用
           - 哔哩哔哩 B站 (7.25.0 / 3.20.4 GP)
@@ -112,7 +115,7 @@ jobs:
           - 原项目: [V-E-O/biliSpeed](https://github.com/V-E-O/biliSpeed)
           - AI辅助: Cursor + Claude Opus 4.5
         files: |
-          release/biliSpeed_${{ steps.version.outputs.version }}.apk
+          release/VideoSpeed_${{ steps.version.outputs.version }}.apk
         generate_release_notes: true
         draft: false
         token: ${{ secrets.GITHUB_TOKEN }}

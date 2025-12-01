@@ -1,11 +1,11 @@
-# Bili调速 (biliSpeed)
+# 视频调速 VideoSpeed
 
-[![GitHub stars](https://img.shields.io/github/stars/MarsGao/com.veo.hook.bili.speed?style=social)](https://github.com/MarsGao/com.veo.hook.bili.speed/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/MarsGao/com.veo.hook.bili.speed?style=social)](https://github.com/MarsGao/com.veo.hook.bili.speed/network/members)
-[![GitHub release](https://img.shields.io/github/v/release/MarsGao/com.veo.hook.bili.speed)](https://github.com/MarsGao/com.veo.hook.bili.speed/releases)
-[![License](https://img.shields.io/github/license/MarsGao/com.veo.hook.bili.speed)](LICENSE.md)
+[![GitHub stars](https://img.shields.io/github/stars/MarsGao/io.github.MarsGao.speed?style=social)](https://github.com/MarsGao/io.github.MarsGao.speed/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/MarsGao/io.github.MarsGao.speed?style=social)](https://github.com/MarsGao/io.github.MarsGao.speed/network/members)
+[![GitHub release](https://img.shields.io/github/v/release/MarsGao/io.github.MarsGao.speed)](https://github.com/MarsGao/io.github.MarsGao.speed/releases)
+[![License](https://img.shields.io/github/license/MarsGao/io.github.MarsGao.speed)](LICENSE.md)
 
-Bili默认播放速度调节 - 一个基于Xposed的Android模块，用于调节多个应用的播放速度。
+视频默认播放速度调节 - 一个基于 Xposed 的 Android 模块，用于调节多个应用的视频播放速度。
 
 > 🎉 **这是我的第一个开源项目！** 作为非计算机专业的学习者，感谢开源社区让我有机会参与项目开发和学习。如果这个项目对你有帮助，请给我一个 ⭐ Star，这将是对我最大的鼓励！
 
@@ -40,7 +40,7 @@ Bili默认播放速度调节 - 一个基于Xposed的Android模块，用于调节
 | Telegram | - | ✅ 不上混淆兼容 | |
 | 微博 Weibo | 14.6.0 | ✅ 理论兼容新老版本 | |
 
-> 📝 **说明**: 本人主要使用的应用均来自 **Google Play**，因此主要考虑适配 Google Play 版本。如需其他版本适配，欢迎提 [Issue](https://github.com/MarsGao/com.veo.hook.bili.speed/issues) 反馈！
+> 📝 **说明**: 本人主要使用的应用均来自 **Google Play**，因此主要考虑适配 Google Play 版本。如需其他版本适配，欢迎提 [Issue](https://github.com/MarsGao/io.github.MarsGao.speed/issues) 反馈！
 
 > 💡 **推特用户推荐**: 如果你使用 Twitter/X，强烈推荐 [crimera/twitter-apk](https://github.com/crimera/twitter-apk) 项目，它提供了基于 Piko patches 的 APK 构建。
 
@@ -62,11 +62,15 @@ Bili默认播放速度调节 - 一个基于Xposed的Android模块，用于调节
 
 ## 📥 下载安装
 
-### 方式一：GitHub Releases（推荐）
+### 方式一：LSPosed 模块仓库（推荐）
 
-前往 [Releases](https://github.com/MarsGao/com.veo.hook.bili.speed/releases) 页面下载最新版本的 APK。
+本模块已提交至 [Xposed-Modules-Repo](https://github.com/Xposed-Modules-Repo/)，审核通过后可直接在 LSPosed 管理器中搜索安装。
 
-### 方式二：自行构建
+### 方式二：GitHub Releases
+
+前往 [Releases](https://github.com/MarsGao/io.github.MarsGao.speed/releases) 页面下载最新版本的 APK。
+
+### 方式三：自行构建
 
 #### 🚀 使用 GitHub Actions 自动构建
 
@@ -116,8 +120,8 @@ Bili默认播放速度调节 - 一个基于Xposed的Android模块，用于调节
 
 ```bash
 # 克隆项目
-git clone https://github.com/MarsGao/com.veo.hook.bili.speed.git
-cd biliSpeed
+git clone https://github.com/MarsGao/io.github.MarsGao.speed.git
+cd io.github.MarsGao.speed
 
 # 构建 Debug 版本
 ./gradlew assembleDebug
@@ -138,12 +142,12 @@ cd biliSpeed
 
 3. **激活模块**：
    - 打开 Xposed 管理器 (如 LSPosed)
-   - 启用 "Bili调速" 模块
-   - 勾选需要Hook的目标应用
+   - 启用 "视频调速 VideoSpeed" 模块
+   - 勾选需要 Hook 的目标应用
    - 重启目标应用
 
 4. **设置速度**：
-   - 打开 "Bili调速" 应用
+   - 打开 "视频调速 VideoSpeed" 应用
    - 输入期望速度 (如 1.5)
    - 点击设置
 
@@ -169,6 +173,19 @@ cd biliSpeed
 5. **智能判断**: 通过调用栈分析区分自动播放和手动设置
 
 ## 📋 更新日志
+
+### v1.2.0 (2025-12-01)
+
+**🔄 重大更新：包名重构**
+
+- **包名变更**: `com.veo.hook.bili.speed` → `io.github.MarsGao.speed`
+  - 符合 [Xposed-Modules-Repo](https://github.com/Xposed-Modules-Repo/) 提交要求
+  - 使用规范的命名空间避免冲突
+- **项目名称统一**: "Bili调速" → "视频调速 VideoSpeed"
+  - 更准确反映项目功能（支持多个视频应用，不限于B站）
+- **APK 命名**: `biliSpeed_*.apk` → `VideoSpeed_*.apk`
+
+> ⚠️ **注意**: 由于包名变更，升级前请先卸载旧版本，然后在 LSPosed 中重新激活模块。
 
 ### v1.1.9 (2025-11-30)
 
@@ -225,7 +242,7 @@ cd biliSpeed
 
 欢迎提交 Issue 和 Pull Request！
 
-- 🐛 **发现 Bug？** 请提交 [Issue](https://github.com/MarsGao/com.veo.hook.bili.speed/issues)
+- 🐛 **发现 Bug？** 请提交 [Issue](https://github.com/MarsGao/io.github.MarsGao.speed/issues)
 - 💡 **有新想法？** 欢迎讨论和建议
 - 🔧 **想要贡献代码？** 欢迎提交 PR
 
