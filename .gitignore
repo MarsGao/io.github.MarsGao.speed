@@ -1,3 +1,8 @@
+# include all files in the root directory
+upload-apk-to-release.ps1   
+sync-release.ps1
+
+
 .DS_Store
 
 # Built application files
