@@ -629,6 +629,8 @@ public class MainHook implements IXposedHookLoadPackage {
         String[] playerClasses = {
             "androidx.media3.exoplayer.ExoPlayerImpl",
             "androidx.media3.exoplayer.SimpleExoPlayer",
+            // X 12.7.1 bundles Media3 1.9.3 with R8-obfuscated implementation names.
+            "androidx.media3.exoplayer.i1",
             "com.google.android.exoplayer2.ExoPlayerImpl",
             "com.google.android.exoplayer2.SimpleExoPlayer"
         };
@@ -655,11 +657,12 @@ public class MainHook implements IXposedHookLoadPackage {
 
     private static int hookTwitterPlayerClass(Class<?> playerClass, ClassLoader classLoader) {
         int hookedCount = 0;
+        boolean xMedia3_12_7 = "androidx.media3.exoplayer.i1".equals(playerClass.getName());
         for (Method method : playerClass.getMethods()) {
             try {
                 String name = method.getName();
                 Class<?>[] parameterTypes = method.getParameterTypes();
-                if ("setPlaybackSpeed".equals(name) && parameterTypes.length == 1 && parameterTypes[0] == float.class) {
+                if (("setPlaybackSpeed".equals(name) || (xMedia3_12_7 && "o".equals(name))) && parameterTypes.length == 1 && parameterTypes[0] == float.class) {
                     XposedBridge.hookMethod(method, new XC_MethodHook() {
                         @Override
                         protected void beforeHookedMethod(MethodHookParam param) {
@@ -667,8 +670,8 @@ public class MainHook implements IXposedHookLoadPackage {
                         }
                     });
                     hookedCount++;
-                    logTwitter("hooked " + playerClass.getName() + ".setPlaybackSpeed");
-                } else if ("setPlaybackParameters".equals(name) && parameterTypes.length == 1) {
+                    logTwitter("hooked " + playerClass.getName() + "." + name + " as setPlaybackSpeed");
+                } else if (("setPlaybackParameters".equals(name) || (xMedia3_12_7 && "l".equals(name) && "androidx.media3.common.j0".equals(parameterTypes[0].getName()))) && parameterTypes.length == 1) {
                     XposedBridge.hookMethod(method, new XC_MethodHook() {
                         @Override
                         protected void beforeHookedMethod(MethodHookParam param) {
@@ -676,7 +679,16 @@ public class MainHook implements IXposedHookLoadPackage {
                         }
                     });
                     hookedCount++;
-                    logTwitter("hooked " + playerClass.getName() + ".setPlaybackParameters");
+                    logTwitter("hooked " + playerClass.getName() + "." + name + " as setPlaybackParameters");
+                } else if (xMedia3_12_7 && "j".equals(name) && parameterTypes.length == 0) {
+                    XposedBridge.hookMethod(method, new XC_MethodHook() {
+                        @Override
+                        protected void afterHookedMethod(MethodHookParam param) {
+                            applyTwitterObfuscatedMedia3Speed(param.thisObject);
+                        }
+                    });
+                    hookedCount++;
+                    logTwitter("hooked " + playerClass.getName() + ".j as prepare");
                 } else if (isTwitterPlayerApplyPoint(name, parameterTypes)) {
                     XposedBridge.hookMethod(method, new XC_MethodHook() {
                         @Override
@@ -763,7 +775,36 @@ public class MainHook implements IXposedHookLoadPackage {
             }
         } catch (Throwable ignored) {
         }
+        // X 12.7.1's bundled Media3 1.9.3 R8-renames PlaybackParameters to
+        // androidx.media3.common.j0 and its speed field to "a". Keep this
+        // structural fallback limited to a float field so normal Media3 stays
+        // on the stable public-field path above.
+        try {
+            for (Field field : playbackParameters.getClass().getDeclaredFields()) {
+                if (field.getType() == float.class) {
+                    field.setAccessible(true);
+                    return field.getFloat(playbackParameters);
+                }
+            }
+        } catch (Throwable ignored) {
+        }
         return null;
+    }
+
+    private static void applyTwitterObfuscatedMedia3Speed(Object player) {
+        float targetSpeed = getSpeedConfig();
+        if (Math.abs(targetSpeed - 1.0f) < 0.01f) {
+            return;
+        }
+        twitterApplyingSpeed.set(true);
+        try {
+            XposedHelpers.callMethod(player, "o", targetSpeed);
+            logTwitter("Media3 1.9.3 prepare -> " + targetSpeed);
+        } catch (Throwable e) {
+            logTwitter("Media3 1.9.3 prepare apply failed: " + e.getMessage());
+        } finally {
+            twitterApplyingSpeed.remove();
+        }
     }
 
     private static Object newTwitterPlaybackParameters(Class<?> playbackParametersClass, Object oldParameters, float targetSpeed) {
