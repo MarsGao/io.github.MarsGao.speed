@@ -37,7 +37,7 @@
 | 微信视频号 WeChat | **8.0.69 (3022 GP / 3040)** | ✅ 已适配 | 视频号 feed 默认倍速主动注入 |
 | 抖音 Douyin | 25.6.0 | ✅ 兼容新版本 | 含极速版 |
 | 小红书 | 8.23.0.5 | ✅ 兼容新老版本 | |
-| 推特 Twitter/X | 11.81.0-release.0 / Piko v3.4.0 | ✅ 兼容新版本 | 推荐 [Piko](https://github.com/crimera/piko) |
+| 推特 Twitter/X | 12.7.1-release.0 / Piko v3.4.0 | ✅ 已适配 | Media3 1.9.3 混淆实现；推荐 [Piko](https://github.com/crimera/piko) |
 | Instagram | 315.0.0.29.109 | ✅ 兼容新老版本 | 含 Instander |
 | Telegram | - | ✅ 不上混淆兼容 | |
 | 微博 Weibo | 14.6.0 | ✅ 理论兼容新老版本 | |
@@ -88,9 +88,9 @@
    - 工作流完成后，点击对应的运行
    - 在 "Artifacts" 部分下载 APK 文件
 
-#### 🔐 可选：设置签名密钥 (用于 Release 版本)
+#### 🔐 设置稳定签名密钥（发布必需）
 
-如果您想构建签名版本的 APK：
+公开 Release 必须使用同一套稳定签名密钥；不要发布 CI 临时生成的 debug APK，否则已安装用户无法通过覆盖安装更新。
 
 1. **生成密钥库**：
    ```bash
@@ -128,7 +128,7 @@ cd io.github.MarsGao.speed
 # 构建 Debug 版本
 ./gradlew assembleDebug
 
-# 构建 Release 版本 (需要签名配置)
+# 构建 Release 版本（需要签名配置）
 ./gradlew assembleRelease
 ```
 
@@ -173,10 +173,11 @@ cd io.github.MarsGao.speed
 当前 Android 16 验证基线：
 
 - OnePlus Ace 5: LSPosed `1.9.2 (7024) - Zygisk`, Xposed API `100`
-- OnePlus 13: LSPosed `1.11.0 (7209) - Zygisk`, Xposed API `100`
-- VideoSpeed: `1.2.1`
-- Twitter/X: `11.81.0-release.0` / Piko `v3.4.0`
-- 已观察到 `lspd` 与 `zygisk_lsposed` 正常运行
+- OnePlus 13: Vector/Zygisk，X `12.7.1-release.0` 已观察到 Media3 Hook 初始化
+- Mi 14 Pro (`23116PN5BC`): Android 16、Vector/Zygisk，X `12.7.1-release.0` 已验证 `1.0x → 1.8x` 的设速与 `prepare` 补设日志
+- VideoSpeed: `1.2.8`
+- Twitter/X: `12.7.1-release.0` / Piko `v3.4.0`
+- X `12.7.1-release.0` 已在 Mi 14 Pro 真机触发设速与 `prepare` 补设；后续上游播放器重构仍须按此流程复测
 - `sing-box` 与 `OPCameraPro` 等模块提示需要 Xposed API `101` 时，按维护文档评估是否迁移 Vector，不建议在核心功能正常时盲目替换框架。
 
 ## 🎯 Hook 策略
@@ -190,6 +191,15 @@ cd io.github.MarsGao.speed
 5. **智能判断**: 通过调用栈分析区分自动播放和手动设置
 
 ## 📋 更新日志
+
+### v1.2.8 (2026-08-23)
+
+**🔧 X `12.7.1-release.0` Media3 适配**
+
+- ✅ 适配 X 随 APK 打包的 Media3 `1.9.3` 混淆播放器 `androidx.media3.exoplayer.i1`
+- ✅ Hook 混淆后的 `prepare`、播放参数和直接设速入口，在 `prepare` 后补设模块配置的速度
+- ✅ 保留旧版 X/Piko 与已知 Media3 类名作为回退路径
+- ⚠️ 新版本 X 采用混淆实现；每次上游播放器重构后均需以真机日志和播放页复测为准
 
 ### v1.2.6 (2026-06-25)
 

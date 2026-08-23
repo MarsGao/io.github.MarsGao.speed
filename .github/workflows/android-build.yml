@@ -28,6 +28,7 @@ jobs:
       uses: android-actions/setup-android@v3
 
     - name: Generate debug keystore
+      if: ${{ !startsWith(github.ref, 'refs/tags/') }}
       run: |
         mkdir -p ~/.android
         keytool -genkey -dname "cn=Android Debug, ou=Android, o=Google, l=Unknown, st=Unknown, c=US" \
@@ -68,17 +69,39 @@ jobs:
         echo "Version: $VERSION (Code: $VERSION_CODE)"
         echo "LSPosed Tag: ${VERSION_CODE}-${VERSION}"
 
-    - name: Build debug APK
-      run: ./gradlew assembleDebug --no-daemon
+    - name: Decode release keystore
+      if: startsWith(github.ref, 'refs/tags/')
+      env:
+        SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+      run: |
+        test -n "$SIGNING_KEYSTORE_BASE64" || { echo "Missing SIGNING_KEYSTORE_BASE64; refusing unsigned release."; exit 1; }
+        echo "$SIGNING_KEYSTORE_BASE64" | base64 --decode > /tmp/keystore.jks
+
+    - name: Build APK
+      env:
+        SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+        SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+        SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+      run: |
+        if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+          test -n "$SIGNING_KEY_ALIAS" || { echo "Missing release signing secrets."; exit 1; }
+          ./gradlew assembleRelease --no-daemon
+        else
+          ./gradlew assembleDebug --no-daemon
+        fi
 
     - name: Rename APK with version
       run: |
         VERSION=${{ steps.version.outputs.version }}
         mkdir -p release
-        cp app/build/outputs/apk/debug/app-debug.apk release/VideoSpeed_${VERSION}.apk
+        if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+          cp app/build/outputs/apk/release/app-release.apk release/VideoSpeed_${VERSION}.apk
+        else
+          cp app/build/outputs/apk/debug/app-debug.apk release/VideoSpeed_${VERSION}.apk
+        fi
         echo "APK renamed to: VideoSpeed_${VERSION}.apk"
 
-    - name: Upload debug APK (Artifact)
+    - name: Upload APK artifact
       uses: actions/upload-artifact@v4
       with:
         name: VideoSpeed_${{ steps.version.outputs.version }}
@@ -102,7 +125,7 @@ jobs:
           - 微信视频号 WeChat (8.0.69 / 3022 GP / 3040)
           - 抖音 Douyin (25.6.0)
           - 小红书 (8.23.0.5)
-          - Twitter/X (11.81.0-release.0 / Piko v3.4.0)
+          - Twitter/X (12.7.1-release.0 / Piko v3.4.0)
           - Instagram (315.0.0.29.109)
           - Telegram
           - 微博 Weibo (14.6.0)
