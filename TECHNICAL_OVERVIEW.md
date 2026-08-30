@@ -2,7 +2,7 @@
 
 > 文档定位：这是项目的技术总览、教学材料和外部 AI 上下文入口。它解释“系统为什么能工作”，而不是只给出安装步骤。
 >
-> 当前基线：VideoSpeed `1.2.6`，适配目标为微信 `8.0.69`（`versionCode 3022 GP / 3040`），最后更新：`2026-06-25`。
+> 当前基线：VideoSpeed `1.2.9`，适配目标为微信 `8.0.69` ~ `8.0.77`（`versionCode 3022 GP / 3040 / 3160`），最后更新：`2026-08-30`。
 
 ## 1. 一页读懂
 
@@ -313,10 +313,19 @@ Ace 5 / Android 16 / Vector 实测表明，即使设置页已保存 `1.5`，微�
 
 部分 Vector 目标进程会在 `Application.attach()` 之后才加载模块。配置桥接因此还会从 `ActivityThread.currentApplication()` 获取当前应用上下文，确保 Provider 查询不因错过 `attach()` 而退回旧文件读取。
 
+### 8.6 1.2.9：动态资源解析与通用 ViewHolder 解耦（适配微信 8.0.77+）
+
+在微信 `8.0.77`（`versionCode 3160` 大陆版）中，AAPT2 编译导致资源 ID 重排（`m6e` 由 `0x7f093e42` 变更为 `0x7f095aa3`，`e_k` 由 `0x7f090930` 变更为 `0x7f0922cb`），同时 Feed ViewHolder 类名混淆为 `yr5.s0`。`1.2.9` 重构了注入逻辑：
+
+- **动态资源 ID 解析**：通过 `getWeChatResId(context, name, type)` 调用 `Resources.getIdentifier(...)` 动态解析并带内存缓存，同时配合 DecorView 递归遍历兜底；
+- **通用 ViewHolder 探测**：摒弃对特定混淆类名（如 `me5.s0`）的硬匹配，直接通过 `RecyclerView.ViewHolder` 的 `itemView.findViewById` 及视图树结构探查 `FinderVideoLayout` / `FinderThumbPlayerProxy`；
+- **倍速弹窗与 UIC 支持**：新增对 `FinderSpeedControlUIC` 的点击拦截；
+- **构建链升级**：升级 AGP 至 `8.7.0` 与 Gradle `8.9`，全面兼容 JDK 21 构建环境。
+
 因此，这次升级解决的是两个独立问题：
 
 ```text
-播放稳定性：找到正确实例 + 正确注入时机
+播放稳定性：找到正确实例 + 正确注入时机 + 动态解耦版本混淆
 配置稳定性：让目标进程可靠读到用户刚保存的速度
 ```
 

@@ -963,10 +963,31 @@ public class MainHook implements IXposedHookLoadPackage {
     private static final int WX_DISCOVERY_LOG_LIMIT = 120;
     private static final java.util.Map<String, Boolean> wxDiscoveredClassNames = new ConcurrentHashMap<>();
     private static final java.util.Map<String, Boolean> wxHookedClassNames = new ConcurrentHashMap<>();
+    private static final java.util.Map<String, Integer> wxResIdCache = new ConcurrentHashMap<>();
     private static volatile long wxLastManualSpeedChangeAt = 0L;
-    private static final int WX_FINDER_RECYCLER_VIEW_ID = 2131318338; // R.id.m6e
-    private static final int WX_FINDER_VIDEO_LAYOUT_ID = 2131304752; // R.id.e_k
     private static final ThreadLocal<Boolean> wxApplyingSpeed = new ThreadLocal<>();
+
+    private static int getWeChatResId(Context context, String name, String defType, int fallbackId) {
+        if (context == null) {
+            return fallbackId;
+        }
+        String key = defType + "/" + name;
+        Integer cached = wxResIdCache.get(key);
+        if (cached != null) {
+            return cached;
+        }
+        try {
+            int id = context.getResources().getIdentifier(name, defType, "com.tencent.mm");
+            if (id != 0) {
+                wxResIdCache.put(key, id);
+                logWeChatHook("[ResId] resolved " + key + " = 0x" + Integer.toHexString(id) + " (" + id + ")");
+                return id;
+            }
+        } catch (Throwable t) {
+            logWeChatHook("[ResId] getIdentifier failed for " + key + ": " + t.getMessage());
+        }
+        return fallbackId;
+    }
 
     private static void hookWeChatFinderFeedSpeedInjector(XC_LoadPackage.LoadPackageParam lpparam) {
         try {
@@ -997,30 +1018,38 @@ public class MainHook implements IXposedHookLoadPackage {
     }
 
     private static void hookWeChatFinderSpeedMenuClick(XC_LoadPackage.LoadPackageParam lpparam) {
-        try {
-            XposedHelpers.findAndHookMethod(
-                "com.tencent.mm.plugin.finder.viewmodel.component.q40",
-                lpparam.classLoader,
-                "onClick",
-                android.view.View.class,
-                new XC_MethodHook() {
-                    @Override
-                    protected void beforeHookedMethod(MethodHookParam param) {
-                        try {
-                            Object tag = ((android.view.View)param.args[0]).getTag();
-                            if (tag instanceof Float) {
-                                wxLastManualSpeedChangeAt = System.currentTimeMillis();
-                                logWeChatHook("[FinderInject] manual speed menu click: " + tag);
-                            }
-                        } catch (Throwable e) {
-                            logWeChatHook("[FinderInject] manual speed click inspect failed: " + e.getMessage());
+        String[] menuClasses = {
+            "com.tencent.mm.plugin.finder.viewmodel.component.q40",
+            "com.tencent.mm.plugin.finder.viewmodel.component.FinderSpeedControlUIC",
+            "com.tencent.mm.plugin.finder.viewmodel.component.y00"
+        };
+        for (String cname : menuClasses) {
+            try {
+                Class<?> clazz = XposedHelpers.findClassIfExists(cname, lpparam.classLoader);
+                if (clazz != null) {
+                    for (Method m : clazz.getDeclaredMethods()) {
+                        if ("onClick".equals(m.getName()) && m.getParameterCount() == 1 && android.view.View.class.isAssignableFrom(m.getParameterTypes()[0])) {
+                            XposedBridge.hookMethod(m, new XC_MethodHook() {
+                                @Override
+                                protected void beforeHookedMethod(MethodHookParam param) {
+                                    try {
+                                        Object tag = ((android.view.View)param.args[0]).getTag();
+                                        if (tag instanceof Float) {
+                                            wxLastManualSpeedChangeAt = System.currentTimeMillis();
+                                            logWeChatHook("[FinderInject] manual speed menu click: " + tag);
+                                        }
+                                    } catch (Throwable e) {
+                                        logWeChatHook("[FinderInject] manual speed click inspect failed: " + e.getMessage());
+                                    }
+                                }
+                            });
+                            logWeChatHook("[FinderInject] " + cname + "." + m.getName() + " hook installed");
                         }
                     }
                 }
-            );
-            logWeChatHook("[FinderInject] q40.onClick hook installed");
-        } catch (Throwable e) {
-            logWeChatHook("[FinderInject] q40.onClick hook failed: " + e.getMessage());
+            } catch (Throwable e) {
+                logWeChatHook("[FinderInject] " + cname + " hook failed: " + e.getMessage());
+            }
         }
     }
 
@@ -1241,30 +1270,17 @@ public class MainHook implements IXposedHookLoadPackage {
             logWeChatHook("[FinderInject] " + source + " skipped in manual cooldown");
             return;
         }
-        android.view.View recycler = activity.findViewById(WX_FINDER_RECYCLER_VIEW_ID);
-        try {
-            Object innerRecycler = XposedHelpers.callMethod(recycler, "getRecyclerView");
-            if (innerRecycler instanceof android.view.View) {
-                recycler = (android.view.View)innerRecycler;
-            }
-        } catch (Throwable ignored) {
-        }
-        if (!(recycler instanceof android.view.ViewGroup)) {
+        android.view.ViewGroup recyclerView = findWeChatFinderRecyclerView(activity);
+        if (recyclerView == null) {
             logWeChatHook("[FinderInject] " + source + " recycler not found");
             return;
         }
-        android.view.ViewGroup recyclerView = (android.view.ViewGroup)recycler;
         Object holder = findWeChatFinderCurrentHolder(recyclerView);
         if (holder == null) {
             logWeChatHook("[FinderInject] " + source + " holder not found");
             return;
         }
-        Object videoLayout = XposedHelpers.callMethod(holder, "o", WX_FINDER_VIDEO_LAYOUT_ID);
-        if (videoLayout == null) {
-            logWeChatHook("[FinderInject] " + source + " video layout not found");
-            return;
-        }
-        Object videoView = XposedHelpers.callMethod(videoLayout, "getVideoView");
+        Object videoView = findWeChatFinderVideoView(holder, activity);
         if (videoView == null) {
             logWeChatHook("[FinderInject] " + source + " video view not found");
             return;
@@ -1272,27 +1288,82 @@ public class MainHook implements IXposedHookLoadPackage {
         applyWeChatTargetSpeed(videoView, activity.getClassLoader(), source + " current " + videoView.getClass().getName());
     }
 
+    private static android.view.ViewGroup findWeChatFinderRecyclerView(android.app.Activity activity) {
+        int m6eId = getWeChatResId(activity, "m6e", "id", 2131318338);
+        if (m6eId != 0) {
+            android.view.View recycler = activity.findViewById(m6eId);
+            if (recycler != null) {
+                try {
+                    Object inner = XposedHelpers.callMethod(recycler, "getRecyclerView");
+                    if (inner instanceof android.view.ViewGroup) {
+                        return (android.view.ViewGroup) inner;
+                    }
+                } catch (Throwable ignored) {
+                }
+                if (recycler instanceof android.view.ViewGroup) {
+                    return (android.view.ViewGroup) recycler;
+                }
+            }
+        }
+        try {
+            android.view.View decor = activity.getWindow().getDecorView();
+            android.view.ViewGroup found = findRecyclerViewInViewTree(decor);
+            if (found != null) {
+                return found;
+            }
+        } catch (Throwable ignored) {
+        }
+        return null;
+    }
+
+    private static android.view.ViewGroup findRecyclerViewInViewTree(android.view.View root) {
+        if (root == null) return null;
+        String cname = root.getClass().getName();
+        if (cname.contains("RecyclerView") || cname.contains("RefreshLoadMoreLayout")) {
+            try {
+                Object inner = XposedHelpers.callMethod(root, "getRecyclerView");
+                if (inner instanceof android.view.ViewGroup) {
+                    return (android.view.ViewGroup) inner;
+                }
+            } catch (Throwable ignored) {
+            }
+            if (root instanceof android.view.ViewGroup) {
+                return (android.view.ViewGroup) root;
+            }
+        }
+        if (root instanceof android.view.ViewGroup) {
+            android.view.ViewGroup group = (android.view.ViewGroup) root;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                android.view.ViewGroup res = findRecyclerViewInViewTree(group.getChildAt(i));
+                if (res != null) return res;
+            }
+        }
+        return null;
+    }
+
     private static Object findWeChatFinderCurrentHolder(android.view.ViewGroup recyclerView) {
         int position = -1;
         try {
             Object layoutManager = XposedHelpers.callMethod(recyclerView, "getLayoutManager");
             if (layoutManager != null) {
-                Object result = XposedHelpers.callMethod(layoutManager, "w");
-                if (result instanceof Integer) {
-                    position = (Integer)result;
+                try {
+                    Object result = XposedHelpers.callMethod(layoutManager, "w");
+                    if (result instanceof Integer) {
+                        position = (Integer)result;
+                    }
+                } catch (Throwable ignored) {
+                }
+                if (position < 0) {
+                    try {
+                        Object result = XposedHelpers.callMethod(layoutManager, "findFirstVisibleItemPosition");
+                        if (result instanceof Integer) {
+                            position = (Integer)result;
+                        }
+                    } catch (Throwable ignored) {
+                    }
                 }
             }
         } catch (Throwable ignored) {
-        }
-        if (position < 0) {
-            try {
-                Object layoutManager = XposedHelpers.callMethod(recyclerView, "getLayoutManager");
-                Object result = XposedHelpers.callMethod(layoutManager, "findFirstVisibleItemPosition");
-                if (result instanceof Integer) {
-                    position = (Integer)result;
-                }
-            } catch (Throwable ignored) {
-            }
         }
         if (position >= 0) {
             try {
@@ -1313,10 +1384,79 @@ public class MainHook implements IXposedHookLoadPackage {
         for (int i = 0; i < recyclerView.getChildCount(); i++) {
             try {
                 Object holder = XposedHelpers.callMethod(recyclerView, "getChildViewHolder", recyclerView.getChildAt(i));
-                if (holder != null && "me5.s0".equals(holder.getClass().getName())) {
+                if (holder != null) {
                     return holder;
                 }
             } catch (Throwable ignored) {
+            }
+        }
+        return null;
+    }
+
+    private static Object findWeChatFinderVideoView(Object holder, android.app.Activity activity) {
+        if (holder == null) return null;
+        int videoLayoutId = getWeChatResId(activity, "e_k", "id", 2131304752);
+
+        if (videoLayoutId != 0) {
+            String[] holderFindMethods = {"o", "n", "findView", "findViewById"};
+            for (String m : holderFindMethods) {
+                try {
+                    Object videoLayout = XposedHelpers.callMethod(holder, m, videoLayoutId);
+                    if (videoLayout != null) {
+                        Object videoView = XposedHelpers.callMethod(videoLayout, "getVideoView");
+                        if (videoView != null) {
+                            return videoView;
+                        }
+                    }
+                } catch (Throwable ignored) {
+                }
+            }
+        }
+
+        try {
+            Field itemViewField = XposedHelpers.findFieldIfExists(holder.getClass(), "itemView");
+            if (itemViewField != null) {
+                Object itemView = itemViewField.get(holder);
+                if (itemView instanceof android.view.View) {
+                    android.view.View v = (android.view.View) itemView;
+                    if (videoLayoutId != 0) {
+                        android.view.View layoutView = v.findViewById(videoLayoutId);
+                        if (layoutView != null) {
+                            try {
+                                Object videoView = XposedHelpers.callMethod(layoutView, "getVideoView");
+                                if (videoView != null) return videoView;
+                            } catch (Throwable ignored) {
+                            }
+                        }
+                    }
+                    Object videoView = findVideoViewInTree(v);
+                    if (videoView != null) return videoView;
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+
+        return null;
+    }
+
+    private static Object findVideoViewInTree(android.view.View root) {
+        if (root == null) return null;
+        String cname = root.getClass().getName();
+        if (cname.contains("FinderThumbPlayerProxy")) {
+            return root;
+        }
+        if (cname.contains("FinderVideoLayout")) {
+            try {
+                Object videoView = XposedHelpers.callMethod(root, "getVideoView");
+                if (videoView != null) return videoView;
+            } catch (Throwable ignored) {
+            }
+        }
+        if (root instanceof android.view.ViewGroup) {
+            android.view.ViewGroup group = (android.view.ViewGroup) root;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                Object found = findVideoViewInTree(group.getChildAt(i));
+                if (found != null) return found;
             }
         }
         return null;
