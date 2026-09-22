@@ -2,4 +2,7 @@
     <string name="app_name">视频调速 VideoSpeed</string>
     <string name="app_desc">视频默认播放速度调节 Xposed模块</string>
     <string name="title_activity_main">视频调速 VideoSpeed</string>
+    <string name="speed_label">默认播放速度</string>
+    <string name="speed_hint">0.25–4.0</string>
+    <string name="set_speed">设置</string>
 </resources>

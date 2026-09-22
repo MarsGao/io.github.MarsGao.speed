@@ -8,6 +8,8 @@ import de.robv.android.xposed.XposedBridge;
 
 /** Resolves the configured speed inside an injected target-app process. */
 final class SpeedConfigBridge {
+    private static final float MIN_SPEED = 0.25f;
+    private static final float MAX_SPEED = 4.0f;
     private static volatile Context applicationContext;
     private static volatile Float lastProviderSpeed;
     private static volatile String lastSource;
@@ -28,7 +30,7 @@ final class SpeedConfigBridge {
         }
         legacyPrefs.reload();
         logSource("XSharedPreferences fallback");
-        return legacyPrefs.getFloat("speed", fallback);
+        return sanitizeSpeed(legacyPrefs.getFloat("speed", fallback), fallback);
     }
 
     static boolean hasSpeedChanged(XSharedPreferences legacyPrefs) {
@@ -54,7 +56,7 @@ final class SpeedConfigBridge {
                 null)) {
             if (cursor != null && cursor.moveToFirst()) {
                 float speed = cursor.getFloat(cursor.getColumnIndexOrThrow(SpeedConfigProvider.COLUMN_SPEED));
-                if (Float.isFinite(speed)) {
+                if (isValidSpeed(speed)) {
                     logSource("ContentProvider");
                     return speed;
                 }
@@ -63,6 +65,14 @@ final class SpeedConfigBridge {
             logSource("XSharedPreferences fallback");
         }
         return null;
+    }
+
+    private static float sanitizeSpeed(float speed, float fallback) {
+        return isValidSpeed(speed) ? speed : fallback;
+    }
+
+    private static boolean isValidSpeed(float speed) {
+        return Float.isFinite(speed) && speed >= MIN_SPEED && speed <= MAX_SPEED;
     }
 
     private static Context resolveContext() {

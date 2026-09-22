@@ -17,9 +17,11 @@
         android:orientation="horizontal">
 
         <TextView
+            android:id="@+id/speedLabel"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="默认播放速度"
+            android:labelFor="@id/editTextText"
+            android:text="@string/speed_label"
             android:textAppearance="@android:style/TextAppearance.Material.Large"
             android:textColor="#f4d19e" />
 
@@ -31,7 +33,9 @@
             android:backgroundTint="#f4d19e"
             android:ems="3"
             android:gravity="center_horizontal"
-            android:inputType="text"
+            android:hint="@string/speed_hint"
+            android:importantForAutofill="no"
+            android:inputType="numberDecimal"
             android:selectAllOnFocus="true"
             android:singleLine="true"
             android:textColor="#ffffff"
@@ -52,7 +56,7 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:background="@drawable/button_bg"
-            android:text="设置"
+            android:text="@string/set_speed"
             android:textColor="#f4d19e"
             android:textSize="17sp" />
     </LinearLayout>

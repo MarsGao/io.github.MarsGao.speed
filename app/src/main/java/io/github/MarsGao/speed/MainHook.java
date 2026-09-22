@@ -12,6 +12,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.Locale;
 import java.util.concurrent.ConcurrentHashMap;
 
 import de.robv.android.xposed.IXposedHookLoadPackage;
@@ -43,6 +44,8 @@ public class MainHook implements IXposedHookLoadPackage {
     private static XC_MethodHook.Unhook third = null;
     private static Field twField = null;
     private static Method twMethod = null;
+    private static final ConcurrentHashMap<String, Boolean> twitterHookedMethods = new ConcurrentHashMap<>();
+    private static volatile boolean twitterAttachRetryInstalled = false;
 
     private static float getSpeedConfig() {
         return SpeedConfigBridge.getSpeed(prefs, 1.5f);
@@ -111,7 +114,8 @@ public class MainHook implements IXposedHookLoadPackage {
             hookApplicationContext();
             if (twitter) {
                 logTwitter("handleLoadPackage process=" + lpparam.processName);
-                hookTwitterModernPlayers(lpparam);
+                hookTwitterModernPlayers(lpparam.classLoader, "handleLoadPackage");
+                hookTwitterModernPlayersAfterAttach();
                 hookTwitterLegacy(lpparam);
 
             } else if (bili) {
@@ -625,12 +629,28 @@ public class MainHook implements IXposedHookLoadPackage {
 
     private static final ThreadLocal<Boolean> twitterApplyingSpeed = new ThreadLocal<>();
 
-    private static void hookTwitterModernPlayers(XC_LoadPackage.LoadPackageParam lpparam) {
+    private static void hookTwitterModernPlayersAfterAttach() {
+        if (twitterAttachRetryInstalled) {
+            return;
+        }
+        twitterAttachRetryInstalled = true;
+        XposedHelpers.findAndHookMethod(Application.class, "attach", Context.class, new XC_MethodHook() {
+            @Override
+            protected void afterHookedMethod(MethodHookParam param) {
+                Context context = (Context) param.args[0];
+                hookTwitterModernPlayers(context.getClassLoader(), "Application.attach");
+            }
+        });
+    }
+
+    private static void hookTwitterModernPlayers(ClassLoader classLoader, String source) {
         String[] playerClasses = {
             "androidx.media3.exoplayer.ExoPlayerImpl",
             "androidx.media3.exoplayer.SimpleExoPlayer",
             // X 12.7.1 bundles Media3 1.9.3 with R8-obfuscated implementation names.
             "androidx.media3.exoplayer.i1",
+            // X 12.27.0 bundles a newer R8 mapping of the Media3 ExoPlayer implementation.
+            "androidx.media3.exoplayer.d0",
             "com.google.android.exoplayer2.ExoPlayerImpl",
             "com.google.android.exoplayer2.SimpleExoPlayer"
         };
@@ -638,30 +658,35 @@ public class MainHook implements IXposedHookLoadPackage {
         int hookedCount = 0;
         for (String className : playerClasses) {
             try {
-                Class<?> playerClass = XposedHelpers.findClassIfExists(className, lpparam.classLoader);
+                Class<?> playerClass = XposedHelpers.findClassIfExists(className, classLoader);
                 if (playerClass == null) {
                     continue;
                 }
-                hookedCount += hookTwitterPlayerClass(playerClass, lpparam.classLoader);
+                hookedCount += hookTwitterPlayerClass(playerClass, classLoader);
             } catch (Exception e) {
                 logTwitter("modern hook failed for " + className + ": " + e.getMessage());
             }
         }
 
         if (hookedCount > 0) {
-            logTwitter("modern hook installed");
+            logTwitter("modern hook installed from " + source + ", methods=" + hookedCount);
         } else {
-            logTwitter("no known player class found");
+            logTwitter("no new player methods hooked from " + source);
         }
     }
 
     private static int hookTwitterPlayerClass(Class<?> playerClass, ClassLoader classLoader) {
         int hookedCount = 0;
         boolean xMedia3_12_7 = "androidx.media3.exoplayer.i1".equals(playerClass.getName());
+        boolean xMedia3_12_27 = "androidx.media3.exoplayer.d0".equals(playerClass.getName());
         for (Method method : playerClass.getMethods()) {
             try {
                 String name = method.getName();
                 Class<?>[] parameterTypes = method.getParameterTypes();
+                String hookKey = playerClass.getName() + "#" + method.toGenericString();
+                if (twitterHookedMethods.containsKey(hookKey)) {
+                    continue;
+                }
                 if (("setPlaybackSpeed".equals(name) || (xMedia3_12_7 && "o".equals(name))) && parameterTypes.length == 1 && parameterTypes[0] == float.class) {
                     XposedBridge.hookMethod(method, new XC_MethodHook() {
                         @Override
@@ -669,15 +694,20 @@ public class MainHook implements IXposedHookLoadPackage {
                             handleTwitterSetPlaybackSpeed(param);
                         }
                     });
+                    twitterHookedMethods.put(hookKey, true);
                     hookedCount++;
                     logTwitter("hooked " + playerClass.getName() + "." + name + " as setPlaybackSpeed");
-                } else if (("setPlaybackParameters".equals(name) || (xMedia3_12_7 && "l".equals(name) && "androidx.media3.common.j0".equals(parameterTypes[0].getName()))) && parameterTypes.length == 1) {
+                } else if (parameterTypes.length == 1 &&
+                        ("setPlaybackParameters".equals(name) ||
+                         (xMedia3_12_7 && "l".equals(name) && "androidx.media3.common.j0".equals(parameterTypes[0].getName())) ||
+                         (xMedia3_12_27 && "c".equals(name) && "androidx.media3.common.v0".equals(parameterTypes[0].getName())))) {
                     XposedBridge.hookMethod(method, new XC_MethodHook() {
                         @Override
                         protected void beforeHookedMethod(MethodHookParam param) {
                             handleTwitterSetPlaybackParameters(param, parameterTypes[0]);
                         }
                     });
+                    twitterHookedMethods.put(hookKey, true);
                     hookedCount++;
                     logTwitter("hooked " + playerClass.getName() + "." + name + " as setPlaybackParameters");
                 } else if (xMedia3_12_7 && "j".equals(name) && parameterTypes.length == 0) {
@@ -687,8 +717,19 @@ public class MainHook implements IXposedHookLoadPackage {
                             applyTwitterObfuscatedMedia3Speed(param.thisObject);
                         }
                     });
+                    twitterHookedMethods.put(hookKey, true);
                     hookedCount++;
                     logTwitter("hooked " + playerClass.getName() + ".j as prepare");
+                } else if (xMedia3_12_27 && "b".equals(name) && parameterTypes.length == 0) {
+                    XposedBridge.hookMethod(method, new XC_MethodHook() {
+                        @Override
+                        protected void afterHookedMethod(MethodHookParam param) {
+                            applyTwitterObfuscatedMedia3Speed(param.thisObject, "c", "androidx.media3.common.v0", "Media3 12.27 prepare");
+                        }
+                    });
+                    twitterHookedMethods.put(hookKey, true);
+                    hookedCount++;
+                    logTwitter("hooked " + playerClass.getName() + ".b as prepare");
                 } else if (isTwitterPlayerApplyPoint(name, parameterTypes)) {
                     XposedBridge.hookMethod(method, new XC_MethodHook() {
                         @Override
@@ -699,6 +740,7 @@ public class MainHook implements IXposedHookLoadPackage {
                             applyTwitterSpeed(param.thisObject, classLoader, "after " + name);
                         }
                     });
+                    twitterHookedMethods.put(hookKey, true);
                     hookedCount++;
                     logTwitter("hooked " + playerClass.getName() + "." + name);
                 }
@@ -792,16 +834,29 @@ public class MainHook implements IXposedHookLoadPackage {
     }
 
     private static void applyTwitterObfuscatedMedia3Speed(Object player) {
+        applyTwitterObfuscatedMedia3Speed(player, "o", null, "Media3 1.9.3 prepare");
+    }
+
+    private static void applyTwitterObfuscatedMedia3Speed(Object player, String setterName, String playbackParametersClassName, String source) {
         float targetSpeed = getSpeedConfig();
         if (Math.abs(targetSpeed - 1.0f) < 0.01f) {
             return;
         }
         twitterApplyingSpeed.set(true);
         try {
-            XposedHelpers.callMethod(player, "o", targetSpeed);
-            logTwitter("Media3 1.9.3 prepare -> " + targetSpeed);
+            if (playbackParametersClassName == null) {
+                XposedHelpers.callMethod(player, setterName, targetSpeed);
+            } else {
+                Class<?> parametersClass = XposedHelpers.findClass(playbackParametersClassName, player.getClass().getClassLoader());
+                Object parameters = newTwitterPlaybackParameters(parametersClass, null, targetSpeed);
+                if (parameters == null) {
+                    throw new IllegalStateException("PlaybackParameters construction failed");
+                }
+                XposedHelpers.callMethod(player, setterName, parameters);
+            }
+            logTwitter(source + " -> " + targetSpeed);
         } catch (Throwable e) {
-            logTwitter("Media3 1.9.3 prepare apply failed: " + e.getMessage());
+            logTwitter(source + " apply failed: " + e.getMessage());
         } finally {
             twitterApplyingSpeed.remove();
         }
@@ -1174,7 +1229,7 @@ public class MainHook implements IXposedHookLoadPackage {
         if (className == null) {
             return false;
         }
-        String lower = className.toLowerCase();
+        String lower = className.toLowerCase(Locale.ROOT);
         if (!(lower.startsWith("com.tencent.mm") || lower.startsWith("com.tencent.liteav") ||
                 lower.startsWith("com.tencent.rtmp") || lower.startsWith("com.google.android.exoplayer") ||
                 lower.startsWith("androidx.media3"))) {
@@ -1185,7 +1240,7 @@ public class MainHook implements IXposedHookLoadPackage {
     }
 
     private static boolean isWeChatSpeedMethodName(String methodName, String className) {
-        String lowerName = methodName.toLowerCase();
+        String lowerName = methodName.toLowerCase(Locale.ROOT);
         if (lowerName.contains("speed") || lowerName.contains("rate") || lowerName.contains("playback")) {
             return true;
         }
@@ -1193,7 +1248,7 @@ public class MainHook implements IXposedHookLoadPackage {
     }
 
     private static boolean isWeChatPlaybackStartMethod(String methodName, Class<?>[] parameterTypes) {
-        String lowerName = methodName.toLowerCase();
+        String lowerName = methodName.toLowerCase(Locale.ROOT);
         if (parameterTypes.length == 0 && (lowerName.equals("start") || lowerName.equals("play") ||
                 lowerName.equals("resume") || lowerName.equals("prepare"))) {
             return true;
@@ -1738,8 +1793,8 @@ public class MainHook implements IXposedHookLoadPackage {
         logWeChatHook("[StackTrace] " + stackInfo.toString());
         
         for (int i = 3; i < Math.min(20, stackTrace.length); i++) {
-            String className = stackTrace[i].getClassName().toLowerCase();
-            String methodName = stackTrace[i].getMethodName().toLowerCase();
+            String className = stackTrace[i].getClassName().toLowerCase(Locale.ROOT);
+            String methodName = stackTrace[i].getMethodName().toLowerCase(Locale.ROOT);
             
             // 只检测明确的用户交互方法，避免误判
             // 1. 检查点击事件 - 必须是完整的onClick方法

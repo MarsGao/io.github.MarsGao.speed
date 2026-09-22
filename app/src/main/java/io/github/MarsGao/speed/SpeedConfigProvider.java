@@ -17,6 +17,8 @@ public class SpeedConfigProvider extends ContentProvider {
     public static final String COLUMN_SPEED = "speed";
     public static final Uri SPEED_URI = Uri.parse("content://" + AUTHORITY + "/" + PATH_SPEED);
     private static final float DEFAULT_SPEED = 1.5f;
+    private static final float MIN_SPEED = 0.25f;
+    private static final float MAX_SPEED = 4.0f;
 
     @Override
     public boolean onCreate() {
@@ -29,8 +31,12 @@ public class SpeedConfigProvider extends ContentProvider {
             throw new IllegalArgumentException("Unsupported URI: " + uri);
         }
         SharedPreferences prefs = getContext().getSharedPreferences("speed", 0);
+        float speed = prefs.getFloat(COLUMN_SPEED, DEFAULT_SPEED);
+        if (!Float.isFinite(speed) || speed < MIN_SPEED || speed > MAX_SPEED) {
+            speed = DEFAULT_SPEED;
+        }
         MatrixCursor cursor = new MatrixCursor(new String[]{COLUMN_SPEED}, 1);
-        cursor.addRow(new Object[]{prefs.getFloat(COLUMN_SPEED, DEFAULT_SPEED)});
+        cursor.addRow(new Object[]{speed});
         return cursor;
     }
 

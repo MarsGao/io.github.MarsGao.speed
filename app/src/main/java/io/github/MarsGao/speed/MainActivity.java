@@ -12,6 +12,8 @@ import android.widget.Toast;
 import java.io.File;
 
 public class MainActivity extends Activity {
+    private static final float MIN_SPEED = 0.25f;
+    private static final float MAX_SPEED = 4.0f;
     private static SharedPreferences prefs;
 
     @Override
@@ -36,6 +38,10 @@ public class MainActivity extends Activity {
                 SharedPreferences.Editor e = prefs.edit();
                 try {
                     float speed = Float.parseFloat(et.getText().toString());
+                    if (!Float.isFinite(speed) || speed < MIN_SPEED || speed > MAX_SPEED) {
+                        Toast.makeText(getApplicationContext(), "请输入 0.25 到 4.0 之间的倍速", Toast.LENGTH_LONG).show();
+                        return;
+                    }
                     e.putFloat("speed", speed);
                     if (e.commit()) {
                         makePrefsReadable();
@@ -44,7 +50,7 @@ public class MainActivity extends Activity {
                         Toast.makeText(getApplicationContext(), "设置失败", Toast.LENGTH_LONG).show();
                     }
                 } catch (NumberFormatException ignored) {
-                    Toast.makeText(getApplicationContext(), "输浮点数字~~", Toast.LENGTH_LONG).show();
+                    Toast.makeText(getApplicationContext(), "请输入有效数字", Toast.LENGTH_LONG).show();
                 }
             }
         });

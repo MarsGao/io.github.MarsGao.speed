@@ -18,6 +18,7 @@
 - 🚀 支持多款主流应用：
   - 哔哩哔哩 (B站)
   - 微信视频号
+  - 推特 Twitter/X
   - 抖音
   - 快手
   - 微博
@@ -39,7 +40,7 @@
 | 微信视频号 WeChat | **8.0.69 (3022 GP / 3040) ~ 8.0.77 (3160 大陆版)** | ✅ 已适配 | 视频号 feed 默认倍速主动注入，动态资源解析与通用 ViewHolder |
 | 抖音 Douyin | 25.6.0 | ✅ 兼容新版本 | 含极速版 |
 | 小红书 | 8.23.0.5 | ✅ 兼容新老版本 | |
-| 推特 Twitter/X | 12.7.1-release.0 / Piko v3.4.0 | ✅ 已适配 | Media3 1.9.3 混淆实现；推荐 [Piko](https://github.com/crimera/piko) |
+| 推特 Twitter/X | **12.7.1-release.0 / Piko v3.4.0、12.27.0-prod.01** | ✅ 已适配 | 覆盖两代 Media3 混淆映射；推荐 [Piko](https://github.com/crimera/piko) |
 | Instagram | 315.0.0.29.109 | ✅ 兼容新老版本 | 含 Instander |
 | Telegram | - | ✅ 不上混淆兼容 | |
 | 微博 Weibo | 14.6.0 | ✅ 理论兼容新老版本 | |
@@ -116,7 +117,7 @@
 
 ### 环境要求
 
-- Java JDK 17
+- Java JDK 17 或 21（CI 使用 17，当前本地发布验证使用 21）
 - Android Studio Arctic Fox 或更高版本
 - Android SDK API 33
 
@@ -152,7 +153,7 @@ cd io.github.MarsGao.speed
 
 4. **设置速度**：
    - 打开 "视频调速 VideoSpeed" 应用
-   - 输入期望速度 (如 1.5)
+   - 输入 `0.25x` 到 `4.0x` 之间的期望速度（如 `1.5`）
    - 点击设置
 
 5. **测试**：
@@ -176,10 +177,10 @@ cd io.github.MarsGao.speed
 
 - OnePlus Ace 5: LSPosed `1.9.2 (7024) - Zygisk`, Xposed API `100`
 - OnePlus 13: Vector/Zygisk，X `12.7.1-release.0` 已观察到 Media3 Hook 初始化
-- Mi 14 Pro (`23116PN5BC`): Android 16、Vector/Zygisk，X `12.7.1-release.0` 已验证 `1.0x → 1.8x` 的设速与 `prepare` 补设日志
-- VideoSpeed: `1.2.8`
-- Twitter/X: `12.7.1-release.0` / Piko `v3.4.0`
-- X `12.7.1-release.0` 已在 Mi 14 Pro 真机触发设速与 `prepare` 补设；后续上游播放器重构仍须按此流程复测
+- Mi 14 Pro (`23116PN5BC`): Android 16、Vector/Zygisk，X `12.27.0-prod.01` 已验证 `1.0x → 2.2x` 的设速与 `prepare` 补设日志
+- VideoSpeed: `1.2.10`
+- Twitter/X: `12.7.1-release.0` / Piko `v3.4.0`、`12.27.0-prod.01`
+- X `12.27.0-prod.01` 已在 Mi 14 Pro 真机触发 `d0.c(v0)` 设速与 `d0.b()` prepare 补设；后续上游播放器重构仍须按此流程复测
 - `sing-box` 与 `OPCameraPro` 等模块提示需要 Xposed API `101` 时，按维护文档评估是否迁移 Vector，不建议在核心功能正常时盲目替换框架。
 
 ## 🎯 Hook 策略
@@ -193,6 +194,17 @@ cd io.github.MarsGao.speed
 5. **智能判断**: 通过调用栈分析区分自动播放和手动设置
 
 ## 📋 更新日志
+
+### v1.2.10 (2026-09-22)
+
+**🔧 X `12.27.0-prod.01` Media3 适配**
+
+- ✅ 适配当前 Media3 混淆播放器 `androidx.media3.exoplayer.d0` 与播放参数 `androidx.media3.common.v0`
+- ✅ Hook `c(v0)` 播放参数入口，并在 `b()` prepare 后补设默认速度
+- ✅ 增加 `Application.attach` 后的 ClassLoader 重试和方法级去重，兼容播放器类延迟可见且避免重复 Hook
+- ✅ Mi 14 Pro / Android 16 / Vector 真机验证 `1.0x → 2.2x` 与 prepare 补设均已命中
+- ✅ 构建基线升级至 Java 11 字节码，并清理 AGP 8.7 的 Manifest namespace 警告
+- ✅ 设置页与跨进程配置读取统一限制为 `0.25x ~ 4.0x`，拒绝非有限值和异常范围
 
 ### v1.2.9 (2026-08-30)
 

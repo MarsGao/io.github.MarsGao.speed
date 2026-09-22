@@ -2,7 +2,7 @@
 
 > 文档定位：这是项目的技术总览、教学材料和外部 AI 上下文入口。它解释“系统为什么能工作”，而不是只给出安装步骤。
 >
-> 当前基线：VideoSpeed `1.2.9`，适配目标为微信 `8.0.69` ~ `8.0.77`（`versionCode 3022 GP / 3040 / 3160`），最后更新：`2026-08-30`。
+> 当前基线：VideoSpeed `1.2.10`；微信适配目标为 `8.0.69` ~ `8.0.77`（`versionCode 3022 GP / 3040 / 3160`），X 已验证 `12.7.1-release.0` 与 `12.27.0-prod.01`，最后更新：`2026-09-22`。
 
 ## 1. 一页读懂
 
@@ -90,11 +90,11 @@ handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam)
 
 | 层 | 当前技术 |
 |---|---|
-| 语言 | Java 8 语法级别 |
+| 语言 | Java 11 语法/字节码级别 |
 | Android | `minSdk 26`、`targetSdk 33`、`compileSdk 33` |
 | Hook API | `de.robv.android.xposed:api:82`，`compileOnly` |
 | Hook 运行时 | LSPosed / Vector 等兼容实现 |
-| 构建 | Gradle `8.0`、Android Gradle Plugin、JDK 17 |
+| 构建 | Gradle `8.9`、Android Gradle Plugin `8.7`、JDK 17/21 |
 | 配置 | Android `SharedPreferences` + 只读 `ContentProvider`（`XSharedPreferences` 兼容回退） |
 | 反射 | Java Reflection + `XposedHelpers` |
 | 发布 | GitHub Actions、LSPosed 格式 Tag：`VersionCode-VersionName` |
@@ -320,6 +320,19 @@ Ace 5 / Android 16 / Vector 实测表明，即使设置页已保存 `1.5`，微�
 - **动态资源 ID 解析**：通过 `getWeChatResId(context, name, type)` 调用 `Resources.getIdentifier(...)` 动态解析并带内存缓存，同时配合 DecorView 递归遍历兜底；
 - **通用 ViewHolder 探测**：摒弃对特定混淆类名（如 `me5.s0`）的硬匹配，直接通过 `RecyclerView.ViewHolder` 的 `itemView.findViewById` 及视图树结构探查 `FinderVideoLayout` / `FinderThumbPlayerProxy`；
 - **倍速弹窗与 UIC 支持**：新增对 `FinderSpeedControlUIC` 的点击拦截；
+
+### 8.7 1.2.10：X 12.27.0 Media3 混淆映射适配
+
+X `12.27.0-prod.01`（`versionCode 312270001`）继续使用 Media3，但 R8 映射已与 `12.7.1` 不同：播放器实现由 `androidx.media3.exoplayer.i1` 漂移为 `androidx.media3.exoplayer.d0`，播放参数由 `androidx.media3.common.j0` 漂移为 `androidx.media3.common.v0`。当前映射为：
+
+```text
+d0.c(v0)  <- setPlaybackParameters
+d0.b()    <- prepare
+v0.a      <- speed
+v0.b      <- pitch
+```
+
+模块在播放参数为 `1.0x` 时替换为用户配置，并在 `prepare` 后再次补设。初始化同时在 `Application.attach` 后使用最终 ClassLoader 重试；方法级键值去重避免同一入口被重复 Hook。
 - **构建链升级**：升级 AGP 至 `8.7.0` 与 Gradle `8.9`，全面兼容 JDK 21 构建环境。
 
 因此，这次升级解决的是两个独立问题：
@@ -372,7 +385,14 @@ Ace 5 / Android 16 / Vector 实测表明，即使设置页已保存 `1.5`，微�
 
 验证矩阵记录的是证据强度，不是永久兼容承诺。微信小版本、渠道包、热补丁和设备框架变化后都应重新取证。
 
-### 10.2 快速复测
+### 10.2 X 当前验证矩阵
+
+| 设备/X | 已取得的证据 | 结论 |
+|---|---|---|
+| Xiaomi 14 Pro / Android 16 / Vector / `12.27.0-prod.01 (312270001)` | `d0.b` 与 `d0.c(v0)` 注册成功；实际播放连续出现 `setPlaybackSpeed 1.0 -> 2.2` 与 `Media3 12.27 prepare -> 2.2` | 主路径完整验证 |
+| Xiaomi 14 Pro / `12.7.1-release.0` | 旧版 `i1` 映射曾验证 `1.0x -> 1.8x` 与 prepare 补设 | 兼容路径保留 |
+
+### 10.3 快速复测
 
 ```powershell
 $adb = 'F:\MarsDesktop\#Miui\#ADB\ADB\adb.exe'
@@ -443,7 +463,7 @@ $out | Select-String -Pattern `
 - `MainHook.java` 集中了多个应用的逻辑，后续可按应用拆分，但重构必须配套多应用回归测试。
 - 微信分支仍保留较多广谱/历史兜底 Hook，运行噪声和性能影响值得后续量化。
 - 只读 Provider 会向本机其他应用公开当前倍速；它不提供写入接口，且不承载敏感数据。
-- 设置页只校验 float 格式，尚未限制合理速度范围。
+- 设置页、Provider 与旧配置回退统一接受 `0.25x ~ 4.0x` 的有限值，异常值回退到 `1.5x`。
 - 微信菜单 UI 不与播放器状态同步。
 - 手动菜单增强 Hook 依赖 `q40`，混淆漂移时冷却保护可能降级。
 
@@ -451,10 +471,10 @@ $out | Select-String -Pattern `
 
 ## 14. 构建与发布
 
-本机应显式使用 JDK 17；已知 JDK 21 可能在当前 Android 构建链触发 D8 异常。
+本机应显式使用 JDK 17 或 21；CI 使用 JDK 17，`1.2.10` 已在 JDK 21 / AGP 8.7 / Gradle 8.9 下完成 Debug 构建。Java 源与目标兼容级别为 11。
 
 ```powershell
-$env:JAVA_HOME = 'C:\Program Files\Eclipse Adoptium\jdk-17.0.19.10-hotspot'
+$env:JAVA_HOME = '<JDK 17-or-21 path>'
 $env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
 $env:ANDROID_SDK_ROOT = $env:ANDROID_HOME
 .\gradlew.bat :app:assembleDebug
