@@ -381,6 +381,7 @@ v0.b      <- pitch
 | 设备/微信 | 已取得的证据 | 结论 |
 |---|---|---|
 | Xiaomi 14 Pro / `8.0.69 (3040)` | `onResume`、`touchUp` 均命中真实 `FinderThumbPlayerProxy.setPlaySpeed`；`2.0` 与 `1.5` 日志及体感一致 | 主路径完整验证 |
+| OnePlus 13 / Android 16 / Vector / `8.0.72 (3085)` | VideoSpeed `1.2.10` 下进入视频号、滑动后均命中 `FinderThumbPlayerProxy.setPlaySpeed(1.75)` | 主路径完整验证；主动 RecyclerView 探测失败时 setter Hook 仍可稳定生效 |
 | OnePlus 13 / `8.0.69 (3022 GP)` | 早期版本已由用户确认实际变速；`1.2.4` 已确认安装、配置保留和主 Hook 注册，`q40` 增强 Hook 有混淆漂移 | 主路径兼容，当前 `1.2.4` 的 feed 运行日志仍应在解锁进入视频号后复核 |
 
 验证矩阵记录的是证据强度，不是永久兼容承诺。微信小版本、渠道包、热补丁和设备框架变化后都应重新取证。
@@ -390,6 +391,7 @@ v0.b      <- pitch
 | 设备/X | 已取得的证据 | 结论 |
 |---|---|---|
 | Xiaomi 14 Pro / Android 16 / Vector / `12.27.0-prod.01 (312270001)` | `d0.b` 与 `d0.c(v0)` 注册成功；实际播放连续出现 `setPlaybackSpeed 1.0 -> 2.2` 与 `Media3 12.27 prepare -> 2.2` | 主路径完整验证 |
+| OnePlus 13 / Android 16 / Vector / `12.27.0-prod.01 (312270001)` | VideoSpeed `1.2.10` 安装升级成功；`d0.b` 与 `d0.c(v0)` 注册成功，启动与切换视频连续出现 `1.0 -> 1.75` 与 `prepare -> 1.75` | 主路径完整验证；配置通过兼容回退读取 |
 | Xiaomi 14 Pro / `12.7.1-release.0` | 旧版 `i1` 映射曾验证 `1.0x -> 1.8x` 与 prepare 补设 | 兼容路径保留 |
 
 ### 10.3 快速复测

@@ -176,7 +176,7 @@ cd io.github.MarsGao.speed
 当前 Android 16 验证基线：
 
 - OnePlus Ace 5: LSPosed `1.9.2 (7024) - Zygisk`, Xposed API `100`
-- OnePlus 13: Vector/Zygisk，X `12.7.1-release.0` 已观察到 Media3 Hook 初始化
+- OnePlus 13 (`PJZ110`): Android 16、Vector/Zygisk，X `12.27.0-prod.01` 已验证 `1.0x → 1.75x` 的设速与 `prepare` 补设；微信 `8.0.72 (3085)` 已验证视频号 `setPlaySpeed(1.75)`
 - Mi 14 Pro (`23116PN5BC`): Android 16、Vector/Zygisk，X `12.27.0-prod.01` 已验证 `1.0x → 2.2x` 的设速与 `prepare` 补设日志
 - VideoSpeed: `1.2.10`
 - Twitter/X: `12.7.1-release.0` / Piko `v3.4.0`、`12.27.0-prod.01`
