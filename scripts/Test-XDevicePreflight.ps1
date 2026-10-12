@@ -79,4 +79,3 @@ if ($OutputPath) {
 }
 $json
 if ($report.status -ne 'PREFLIGHT_OK') { exit 1 }
-
