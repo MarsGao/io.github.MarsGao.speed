@@ -38,7 +38,7 @@
 
 ### X 当前版本复测入口
 
-X 的新 APK 或模块候选版本须按 [X 上线验收](docs/X-RELEASE-ACCEPTANCE.md)执行。使用 `scripts/Test-XDevicePreflight.ps1` 核对设备与包版本；可选 `-CollectHookEvidence` 提取当前进程证据。2026-10-12 OnePlus 13 / X `12.28.0-prod.01` 已确认 `1.2.10` 模块加载及两个 Media3 Hook 注册，实际播放完整验收仍待完成，不扩大已验证兼容矩阵。
+X 的新 APK 或模块候选版本须按 [X 上线验收](docs/X-RELEASE-ACCEPTANCE.md)执行。使用 `scripts/Test-XDevicePreflight.ps1` 核对设备与包版本；可选 `-CollectHookEvidence` 提取当前进程证据。2026-10-12 OnePlus 13 / X `12.28.0-prod.01` 已确认 `1.2.10` 模块加载、两个 Media3 Hook 注册及默认 1.75x 实际播放。原生按钮显示与临时 1x 尚有限制，完整上线门禁未通过；按机主指示保留现有实现，详细计时和缺项见验收记录。
 
 ### 术语
 
