@@ -13,6 +13,8 @@
 
 > 📘 想系统理解模块加载、跨进程配置、各应用 Hook 模式以及微信视频号主动注入原理，请阅读 [《VideoSpeed 技术全景与微信视频号适配指南》](TECHNICAL_OVERVIEW.md)。该文档也是版本适配和外部 AI 技术讨论的首要上下文。
 
+> X 新版本上线前须执行 [X / Twitter 适配与上线验收](docs/X-RELEASE-ACCEPTANCE.md)。设备预检与 Hook 日志不能代替实际播放验收。
+
 ## ✨ 功能特性
 
 - 🚀 支持多款主流应用：

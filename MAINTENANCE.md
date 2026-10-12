@@ -36,6 +36,10 @@
 
 ## 📱 设备侧 LSPosed / Vector 维护记录
 
+### X 当前版本复测入口
+
+X 的新 APK 或模块候选版本须按 [X 上线验收](docs/X-RELEASE-ACCEPTANCE.md)执行。使用 `scripts/Test-XDevicePreflight.ps1` 核对设备与包版本；可选 `-CollectHookEvidence` 提取当前进程证据。2026-10-12 OnePlus 13 / X `12.28.0-prod.01` 已确认 `1.2.10` 模块加载及两个 Media3 Hook 注册，实际播放完整验收仍待完成，不扩大已验证兼容矩阵。
+
 ### 术语
 
 - LSPosed 中的中文名称：**模块**
