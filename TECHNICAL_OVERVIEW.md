@@ -2,9 +2,19 @@
 
 > 文档定位：这是项目的技术总览、教学材料和外部 AI 上下文入口。它解释“系统为什么能工作”，而不是只给出安装步骤。
 >
-> 当前基线：VideoSpeed `1.2.10`；微信适配目标为 `8.0.69` ~ `8.0.77`（`versionCode 3022 GP / 3040 / 3160`），X 已验证 `12.7.1-release.0` 与 `12.27.0-prod.01`，最后更新：`2026-09-22`。
+> 当前开发版本：VideoSpeed `1.2.11`；微信原验证范围为 `8.0.69` ~ `8.0.77`（`versionCode 3022 GP / 3040 / 3160`），`8.0.79 / 3200` 已完成播放器定位修复及设速调用验证，完整播放验收待完成。X 已验证 `12.7.1-release.0` 与 `12.27.0-prod.01`，最后更新：`2026-10-16`。
 
 ## 1. 一页读懂
+
+### 微信 8.0.79 适配进展（2026-10-16）
+
+修复前，OnePlus 13（PJZ110）安装微信 `8.0.79 / 3200`、VideoSpeed `1.2.10`，配置速度 `1.8x`。冷启动进入 `FinderHomeAffinityUI` 后，`FinderThumbPlayerProxy.play/setPlaySpeed/setPlaySpeedRatio` 均成功挂钩，但恢复与滑动触发的主动注入出现 `holder not found`，未取得实际设速成功证据。
+
+`1.2.11` 保留原有 holder 路径，在 RecyclerView、holder 或播放器定位失败时，遍历 decorView 下的可见视图，通过 `FinderVideoLayout.getVideoView()` / `FinderThumbPlayerProxy` 选择屏幕可见面积最大的播放器。该路径避开 RecyclerView 方法混淆，并排除不可见预加载视图；保留原有手动调速冷却与延迟触发。
+
+当前状态：`1.2.11 / 1002011` debug 构建与 lint 通过，覆盖安装成功。重启微信后的进程 `27840` 在 `23:42:01`、`23:42:02` 通过可见播放器兜底调用 `setPlaySpeed(1.75)` 成功返回；`23:42:14` 滑动触发同一路径成功。`23:42:07` 的一次滑动触发仍出现 `video view not found`，后续触发恢复。
+
+运行时来源为 `XSharedPreferences fallback`，读取到 `1.75`，但应用私有 `speed.xml` 为 `1.8`；该差异仍待定位。USB 调试反复断开阻碍后续验证；实际播放体验、连续切换稳定性及手动速度行为尚未完成验收。不能将 setter 成功返回视为最终播放速度的测量结果。
 
 VideoSpeed 是一个 Android **Xposed 模块**。它同时包含两个角色：
 

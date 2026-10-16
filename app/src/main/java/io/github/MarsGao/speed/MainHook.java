@@ -1326,21 +1326,52 @@ public class MainHook implements IXposedHookLoadPackage {
             return;
         }
         android.view.ViewGroup recyclerView = findWeChatFinderRecyclerView(activity);
-        if (recyclerView == null) {
-            logWeChatHook("[FinderInject] " + source + " recycler not found");
-            return;
-        }
-        Object holder = findWeChatFinderCurrentHolder(recyclerView);
-        if (holder == null) {
-            logWeChatHook("[FinderInject] " + source + " holder not found");
-            return;
-        }
+        Object holder = recyclerView == null ? null : findWeChatFinderCurrentHolder(recyclerView);
         Object videoView = findWeChatFinderVideoView(holder, activity);
+        // RecyclerView/ViewHolder methods may be obfuscated after a WeChat update.
+        // Locate the largest visible player instead of relying on those method names.
+        if (videoView == null) {
+            videoView = findVisibleWeChatFinderPlayer(activity.getWindow().getDecorView(),
+                    new long[] {0});
+            if (videoView != null) {
+                logWeChatHook("[FinderInject] " + source + " visible player fallback");
+            }
+        }
         if (videoView == null) {
             logWeChatHook("[FinderInject] " + source + " video view not found");
             return;
         }
         applyWeChatTargetSpeed(videoView, activity.getClassLoader(), source + " current " + videoView.getClass().getName());
+    }
+
+    private static Object findVisibleWeChatFinderPlayer(android.view.View root, long[] largestArea) {
+        if (root == null || !root.isShown()) return null;
+        android.graphics.Rect visible = new android.graphics.Rect();
+        if (!root.getGlobalVisibleRect(visible)) return null;
+        Object result = null;
+        String name = root.getClass().getName();
+        if (name.contains("FinderVideoLayout") || name.contains("FinderThumbPlayerProxy")) {
+            long area = (long) visible.width() * visible.height();
+            if (area > largestArea[0]) {
+                try {
+                    Object player = name.contains("FinderThumbPlayerProxy") ? root :
+                            XposedHelpers.callMethod(root, "getVideoView");
+                    if (player != null) {
+                        largestArea[0] = area;
+                        result = player;
+                    }
+                } catch (Throwable ignored) {
+                }
+            }
+        }
+        if (root instanceof android.view.ViewGroup) {
+            android.view.ViewGroup group = (android.view.ViewGroup) root;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                Object player = findVisibleWeChatFinderPlayer(group.getChildAt(i), largestArea);
+                if (player != null) result = player;
+            }
+        }
+        return result;
     }
 
     private static android.view.ViewGroup findWeChatFinderRecyclerView(android.app.Activity activity) {
