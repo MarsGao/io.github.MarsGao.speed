@@ -1062,6 +1062,11 @@ public class MainHook implements IXposedHookLoadPackage {
                         android.view.MotionEvent event = (android.view.MotionEvent)param.args[0];
                         if (event.getActionMasked() == android.view.MotionEvent.ACTION_UP) {
                             scheduleApplyWeChatFinderCurrentSpeed((android.app.Activity)param.thisObject, "FinderActivity.touchUp", 450);
+                            if (param.thisObject.getClass().getName().equals(
+                                    "com.tencent.mm.plugin.finder.feed.ui.FinderProfileTimeLineUI")) {
+                                scheduleApplyWeChatFinderCurrentSpeed((android.app.Activity)param.thisObject,
+                                        "FinderActivity.touchUp", 1200);
+                            }
                         }
                     }
                 }
@@ -1300,15 +1305,17 @@ public class MainHook implements IXposedHookLoadPackage {
     }
 
     private static boolean isWeChatFinderActivity(Object object) {
-        return object instanceof android.app.Activity &&
-                object.getClass().getName().startsWith("com.tencent.mm.plugin.finder.") &&
-                object.getClass().getName().contains("FinderHome");
+        if (!(object instanceof android.app.Activity)) return false;
+        String name = object.getClass().getName();
+        return name.startsWith("com.tencent.mm.plugin.finder.") &&
+                (name.contains("FinderHome") ||
+                        name.equals("com.tencent.mm.plugin.finder.feed.ui.FinderProfileTimeLineUI"));
     }
 
     private static void scheduleApplyWeChatFinderCurrentSpeed(android.app.Activity activity, String source, long delayMs) {
         new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
             try {
-                applyWeChatFinderCurrentSpeed(activity, source);
+                applyWeChatFinderCurrentSpeed(activity, source + " [" + activity.getClass().getSimpleName() + "]");
             } catch (Throwable e) {
                 logWeChatHook("[FinderInject] " + source + " failed: " + e.getMessage());
             }
